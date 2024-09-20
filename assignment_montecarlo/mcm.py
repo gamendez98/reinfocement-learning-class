@@ -5,6 +5,7 @@ from typing import List
 import numpy as np
 from collections import defaultdict
 
+import pandas as pd
 from tqdm import tqdm
 
 from assignment_montecarlo.environment_world import EnvironmentWorld, Action, State
@@ -51,29 +52,28 @@ class MonteCarloAgent:
         step_reward = 0
         visited_state_actions = set()
 
-        for state, action, reward in reversed(episode):
+        for i, (state, action, reward) in enumerate(reversed(episode)):
             step_reward = reward + self.discount_factor * step_reward
 
-            self.Q[state][action] = (self.Q[state][action] * self.episode_count[state][action] + reward) / (
+            self.Q[state][action] = (self.Q[state][action] * self.episode_count[state][action] + step_reward) / (
                     self.episode_count[state][action] + 1)
             self.episode_count[state][action] += 1
             visited_state_actions.add((state, action))
 
     def learn(self, max_episodes: int, convergence_check_frequency: int = 100, convergence_patience: int = 3):
         self.epsilon = self.initial_epsilon
-        old_policy = None
+        old_policy = self.policy.copy()
         for i in tqdm(range(max_episodes), desc='Episodes'):
             check_for_convergence = i % convergence_check_frequency == 0 and i
             episode = self.generate_episode()
             self.update_q(episode)
-            if check_for_convergence:
-                old_policy = self.policy.copy()
             self.improve_policy()
             if check_for_convergence and old_policy == self.policy:
                 convergence_patience -= 1
                 if convergence_patience <= 0:
                     print('Early stop due to convergence.')
                     return
+                old_policy = self.policy.copy()
             self.epsilon *= self.epsilon_decay
 
     def improve_policy(self):
@@ -85,3 +85,14 @@ class MonteCarloAgent:
                 int,
                 {action: 1.0 if action == best_action else 0.0 for action in actions}
             )
+
+    def print_policy(self):
+        policy_matrix = [[None for y in range(self.world.num_rows)] for x in range(self.world.num_cols)]
+        for y in range(self.world.num_rows):
+            for x in range(self.world.num_cols):
+                for action in self.world.ACTIONS:
+                    if self.policy[(x, y)][action]:
+                        policy_matrix[x][y] = action.value
+                        break
+
+        print(pd.DataFrame(policy_matrix).transpose())

@@ -7,11 +7,12 @@ import pandas as pd
 
 # %%
 
-class Action(Enum):
+class Action(str, Enum):
     UP = 'up'
     RIGHT = 'right'
     DOWN = 'down'
     LEFT = 'left'
+
 
 
 # %%
@@ -22,11 +23,12 @@ State = Tuple[int, int]
 class EnvironmentWorld:
     ACTIONS = [action for action in Action]
 
-    def __init__(self, board: List[List[str]]):
+    def __init__(self, board: List[List[str]], noise=0.25):
         self.board = pd.DataFrame(board)
         self.num_rows = len(board)
         self.num_cols = len(board[0])
         self.initial_state = (0, 0)
+        self.noise = noise
         for i, row in self.board.iterrows():
             for j, cell in enumerate(row):
                 if cell == 'S':
@@ -75,6 +77,8 @@ class EnvironmentWorld:
         return x, y
 
     def do_action(self, action: Action) -> Tuple[float, State]:
+        if np.random.rand() < self.noise:
+            action = np.random.choice(self.ACTIONS)
         self.current_state = self.get_next_state(self.current_state, action)
         return self.get_reward(self.current_state), self.current_state
 
@@ -89,11 +93,3 @@ class EnvironmentWorld:
         possibilities = {self.get_next_state(state, action) for action in Action}
         possibilities.add(state)
         return possibilities
-
-    def probability(self, current_state: State, next_state: State, action: Action) -> float:
-        action_index = self.ACTIONS.index(action)
-        alternative_action = self.ACTIONS[(action_index + 1) % len(self.ACTIONS)]
-        default_next_state = self.get_next_state(current_state, action)
-        alternative_next_state = self.get_next_state(current_state, alternative_action)
-        return 0.6 * (default_next_state == next_state) + 0.3 * (
-                    alternative_next_state == next_state) + 0.1 * (next_state == current_state)

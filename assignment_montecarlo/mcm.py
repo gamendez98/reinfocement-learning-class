@@ -4,15 +4,19 @@ from typing import List
 import numpy as np
 from collections import defaultdict
 
+from tqdm import tqdm
+
 from assignment_montecarlo.environment_world import EnvironmentWorld, Action, State
 
-Episode = List[(State, Action, float)]
+Episode = List[tuple[State, Action, float]]
 
 class MonteCarloAgent:
-    def __init__(self, world: EnvironmentWorld, discount_factor:float=1.0, epsilon:float=0.1):
+    def __init__(self, world: EnvironmentWorld, discount_factor:float=1.0, initial_epsilon:float=0.1, epsilon_decay:float=0.999):
         self.world = world
         self.discount_factor = discount_factor
-        self.epsilon = epsilon
+        self.initial_epsilon = initial_epsilon
+        self.epsilon = initial_epsilon
+        self.epsilon_decay = epsilon_decay
         self.Q = defaultdict(lambda: defaultdict(float))  # Q[state][action]
         self.returns = defaultdict(lambda: defaultdict(list))  # Returns[state][action]
         self.policy = defaultdict(lambda: defaultdict(float))  # Policy[state][action]
@@ -51,11 +55,20 @@ class MonteCarloAgent:
             self.Q[state][action] = np.mean(self.returns[state][action]) # type: ignore[assignment]
             visited_state_actions.add((state, action))
 
-    def learn(self, num_episodes: int):
-        for episode_num in range(num_episodes):
+    def learn(self, max_episodes: int, convergence_check_frequency: int = 100):
+        self.epsilon = self.initial_epsilon
+        old_policy = None
+        for i in tqdm(range(max_episodes), desc='Episodes'):
+            check_for_convergence = i % convergence_check_frequency == 0 and i
             episode = self.generate_episode()
             self.update_q(episode)
+            if check_for_convergence:
+                old_policy = self.policy.copy()
             self.improve_policy()
+            if check_for_convergence and old_policy == self.policy:
+                print('Early stop due to convergence.')
+                return
+            self.epsilon *= self.epsilon_decay
 
     def improve_policy(self):
         for state in self.Q:

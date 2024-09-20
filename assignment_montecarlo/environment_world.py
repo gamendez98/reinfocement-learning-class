@@ -14,14 +14,13 @@ class Action(str, Enum):
     LEFT = 'left'
 
 
-
 # %%
 
 State = Tuple[int, int]
 
 
 class EnvironmentWorld:
-    ACTIONS = [action for action in Action]
+    ACTIONS = [Action(action) for action in Action]
 
     def __init__(self, board: List[List[str]], noise=0.25):
         self.board = pd.DataFrame(board)
@@ -47,9 +46,13 @@ class EnvironmentWorld:
     def get_current_state(self) -> State:
         return self.current_state
 
-    @classmethod
-    def get_possible_actions(cls, _state: Tuple[int, int]) -> List[Action]:
-        return cls.ACTIONS
+    def get_state_possible_actions(self, state: State) -> List[Action]:
+        if self.state_is_terminal(state):
+            return []
+        return self.ACTIONS
+
+    def get_possible_actions(self) -> List[Action]:
+        return self.get_state_possible_actions(self.current_state)
 
     def get_reward(self, state: State) -> float:
         x, y = state
@@ -78,7 +81,7 @@ class EnvironmentWorld:
 
     def do_action(self, action: Action) -> Tuple[float, State]:
         if np.random.rand() < self.noise:
-            action = np.random.choice(self.ACTIONS)
+            action = np.random.choice(self.get_possible_actions())
         self.current_state = self.get_next_state(self.current_state, action)
         return self.get_reward(self.current_state), self.current_state
 
@@ -87,9 +90,21 @@ class EnvironmentWorld:
         return self.current_state
 
     def is_terminal(self) -> bool:
-        return self.get_reward(self.current_state) != 0
+        return self.state_is_terminal(self.current_state)
 
-    def get_possible_next_state(self, state: State)-> Set[State]:
-        possibilities = {self.get_next_state(state, action) for action in Action}
+    def state_is_terminal(self, state: State) -> bool:
+        return self.get_reward(state) != 0
+
+    def get_possible_next_state(self, state: State) -> Set[State]:
+        possibilities = {self.get_next_state(state, Action(action)) for action in Action}
         possibilities.add(state)
         return possibilities
+
+    def probability(self, current_state: State, next_state: State, action: Action) -> float:
+        intended_next_state = self.get_next_state(current_state, action)
+        unintended_next_states = [self.get_next_state(current_state, noise_action) for noise_action in
+                                  self.get_state_possible_actions(current_state)]
+        unintended_probability = sum(
+            0.25 * (unintended_state == next_state) for unintended_state in unintended_next_states) * self.noise
+        probs = (1 - self.noise) * (intended_next_state == next_state) + unintended_probability
+        return probs

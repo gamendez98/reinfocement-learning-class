@@ -1,3 +1,4 @@
+import time
 from random import choice
 from typing import List
 
@@ -10,15 +11,17 @@ from assignment_montecarlo.environment_world import EnvironmentWorld, Action, St
 
 Episode = List[tuple[State, Action, float]]
 
+
 class MonteCarloAgent:
-    def __init__(self, world: EnvironmentWorld, discount_factor:float=1.0, initial_epsilon:float=0.1, epsilon_decay:float=0.999):
+    def __init__(self, world: EnvironmentWorld, discount_factor: float = 1.0, initial_epsilon: float = 0.1,
+                 epsilon_decay: float = 0.999):
         self.world = world
         self.discount_factor = discount_factor
         self.initial_epsilon = initial_epsilon
         self.epsilon = initial_epsilon
         self.epsilon_decay = epsilon_decay
         self.Q = defaultdict(lambda: defaultdict(float))  # Q[state][action]
-        self.returns = defaultdict(lambda: defaultdict(list))  # Returns[state][action]
+        self.episode_count = defaultdict(lambda: defaultdict(int))  # number of observations for [state][action]
         self.policy = defaultdict(lambda: defaultdict(float))  # Policy[state][action]
 
     def epsilon_greedy_policy(self, state: State) -> Action:
@@ -51,23 +54,30 @@ class MonteCarloAgent:
         for state, action, reward in reversed(episode):
             step_reward = reward + self.discount_factor * step_reward
 
-            self.returns[state][action].append(step_reward)
-            self.Q[state][action] = np.mean(self.returns[state][action]) # type: ignore[assignment]
+            self.Q[state][action] = (self.Q[state][action] * self.episode_count[state][action] + reward) / (
+                    self.episode_count[state][action] + 1)
+            self.episode_count[state][action] += 1
             visited_state_actions.add((state, action))
 
-    def learn(self, max_episodes: int, convergence_check_frequency: int = 100):
+    def learn(self, max_episodes: int, convergence_check_frequency: int = 100, convergence_patience: int = 3):
         self.epsilon = self.initial_epsilon
         old_policy = None
         for i in tqdm(range(max_episodes), desc='Episodes'):
             check_for_convergence = i % convergence_check_frequency == 0 and i
+            time_0 = time.time()
             episode = self.generate_episode()
+            time_1 = time.time()
             self.update_q(episode)
+            time_2 = time.time()
             if check_for_convergence:
                 old_policy = self.policy.copy()
             self.improve_policy()
+            time_3 = time.time()
             if check_for_convergence and old_policy == self.policy:
-                print('Early stop due to convergence.')
-                return
+                convergence_patience -= 1
+                if convergence_patience <= 0:
+                    print('Early stop due to convergence.')
+                    return
             self.epsilon *= self.epsilon_decay
 
     def improve_policy(self):

@@ -26,7 +26,7 @@ class MonteCarloAgent:
         self.policy = defaultdict(lambda: defaultdict(float))  # Policy[state][action]
 
     def epsilon_greedy_policy(self, state: State) -> Action:
-        actions = self.world.get_possible_actions(state)
+        actions = self.world.get_state_possible_actions(state)
         if np.random.rand() < self.epsilon:
             return choice(actions)
         else:

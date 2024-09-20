@@ -64,15 +64,11 @@ class MonteCarloAgent:
         old_policy = None
         for i in tqdm(range(max_episodes), desc='Episodes'):
             check_for_convergence = i % convergence_check_frequency == 0 and i
-            time_0 = time.time()
             episode = self.generate_episode()
-            time_1 = time.time()
             self.update_q(episode)
-            time_2 = time.time()
             if check_for_convergence:
                 old_policy = self.policy.copy()
             self.improve_policy()
-            time_3 = time.time()
             if check_for_convergence and old_policy == self.policy:
                 convergence_patience -= 1
                 if convergence_patience <= 0:

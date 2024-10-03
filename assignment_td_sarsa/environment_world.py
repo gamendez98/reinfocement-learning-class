@@ -1,3 +1,4 @@
+from collections import defaultdict
 from enum import Enum
 from typing import Tuple, List, Set
 
@@ -22,12 +23,12 @@ State = Tuple[int, int]
 class EnvironmentWorld:
     ACTIONS = [Action(action) for action in Action]
 
-    def __init__(self, board: List[List[str]], terminal_states: List[State] = None, noise=0.25):
+    def __init__(self, board: List[List[str]], terminal_states: List[State] = None, action_noise=None):
+        self.action_noise = action_noise or defaultdict(float)
         self.board = pd.DataFrame(board)
         self.num_rows = len(board)
         self.num_cols = len(board[0])
         self.initial_state = (0, 0)
-        self.noise = noise
         self.terminal_states = terminal_states or []
         for i, row in self.board.iterrows():
             for j, cell in enumerate(row):
@@ -81,7 +82,8 @@ class EnvironmentWorld:
         return x, y
 
     def do_action(self, action: Action) -> Tuple[float, State]:
-        if np.random.rand() < self.noise:
+        noise = self.action_noise[action]
+        if np.random.rand() < noise:
             action = np.random.choice(self.get_possible_actions())
         self.current_state = self.get_next_state(self.current_state, action)
         return self.get_reward(self.current_state), self.current_state

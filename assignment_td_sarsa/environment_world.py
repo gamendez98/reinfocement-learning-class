@@ -23,17 +23,14 @@ State = Tuple[int, int]
 class EnvironmentWorld:
     ACTIONS = [Action(action) for action in Action]
 
-    def __init__(self, board: List[List[str]], terminal_states: List[State] = None, action_noise=None):
+    def __init__(self, board: List[List[str]], terminal_states: List[State] = None, action_noise=None,
+                 initial_state=(0, 0)):
         self.action_noise = action_noise or defaultdict(float)
         self.board = pd.DataFrame(board)
         self.num_rows = len(board)
         self.num_cols = len(board[0])
-        self.initial_state = (0, 0)
+        self.initial_state = initial_state
         self.terminal_states = terminal_states or []
-        for i, row in self.board.iterrows():
-            for j, cell in enumerate(row):
-                if cell == 'S':
-                    self.initial_state = (j, i)
         self.current_state = self.initial_state
 
     def __repr__(self):

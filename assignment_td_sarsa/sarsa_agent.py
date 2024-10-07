@@ -45,9 +45,9 @@ class SarsaAgent:
         state = self.world.current_state
         action = self.get_action(state)
         reward, new_state = self.world.do_action(action)
-        self.update(state, action, new_state, reward)
+        self.update_q(state, action, new_state, reward)
 
-    def update(self, state: State, action: Action, next_state: State, reward: float):
+    def update_q(self, state: State, action: Action, next_state: State, reward: float):
         next_action = self.get_policy(next_state)
         td_error = reward + self.discount_factor * self.Q[next_state][next_action] - self.Q[state][action]
         self.Q[state][action] += self.learning_rate * td_error

@@ -1,11 +1,11 @@
 from collections import defaultdict
-from collections import defaultdict
 from enum import Enum
+from random import choice
 from typing import Tuple, List, Set, NamedTuple, Optional
 
 import numpy as np
 import pandas as pd
-from numpy.random import randint, choice
+from numpy.random import randint
 
 
 # %%
@@ -31,6 +31,7 @@ class Station(NamedTuple):
 class TaxiState(NamedTuple):
     position: Position
     passenger_station: Optional[Station]
+    on_passenger: bool = False
 
 
 class TaxiEnvironmentWorld:
@@ -39,14 +40,14 @@ class TaxiEnvironmentWorld:
 
     def __init__(self, board: List[List[str]], walls: List[Tuple[Position, Position]], stations: List[Station],
                  terminal_states: List[TaxiState] = None, action_noise=None, initial_state=None,
-                 wrong_action_cost: float = 0, drop_off_reward: float = 5, pick_up_reward: float = 1):
+                 wrong_action_cost: float = -10, drop_off_reward: float = 5, pick_up_reward: float = 1):
         self.action_noise = action_noise or defaultdict(float)
         self.stations = stations
         self.wrong_action_cost = wrong_action_cost
         self.drop_off_reward = drop_off_reward
         self.pick_up_reward = pick_up_reward
         self.walls = walls
-        self.passenger = None # position and destiny
+        self.passenger: Optional[TaxiState] = None  # position and destiny
         self.board = pd.DataFrame(board)
         self.num_rows = len(board)
         self.num_cols = len(board[0])
@@ -76,15 +77,15 @@ class TaxiEnvironmentWorld:
         return self.get_state_possible_actions(self.current_state)
 
     def get_reward(self, state: TaxiState, next_state: TaxiState, action: TaxiAction) -> float:
-        _, passenger_station = state
-        position_, passenger_station_ = next_state
+        passenger_station = state.passenger_station
+        position_, passenger_station_ = next_state.position, next_state.passenger_station
         x_, y_ = position_
         if action in self.PASSENGER_ACTIONS:
             if passenger_station and not passenger_station_:  # drop off a passenger
                 return self.drop_off_reward
             if passenger_station_ and not passenger_station:  # pick up a passenger
                 return self.pick_up_reward
-            return self.wrong_action_cost # passenger action failed
+            return self.wrong_action_cost  # passenger action failed
         board_value = self.board.loc[y_, x_]
         try:
             return float(board_value)
@@ -94,9 +95,9 @@ class TaxiEnvironmentWorld:
     def get_next_state(self, state: TaxiState, action: TaxiAction) -> TaxiState:
 
         if action == TaxiAction.PICKUP:
-            return self.do_pick_up_action(state)
+            return self.map_pick_up_action(state)
         if action == TaxiAction.DROPOFF:
-            return self.do_drop_off_action(state)
+            return self.map_drop_off_action(state)
 
         x, y = state.position
         x_, y_ = x, y
@@ -112,28 +113,41 @@ class TaxiEnvironmentWorld:
         next_position = (x_, y_)
         if (state, next_position) in self.walls or (next_position, state) in self.walls:
             next_position = (x, y)
-        return TaxiState(next_position, state.passenger_station)
+        return TaxiState(next_position, state.passenger_station, on_passenger=self.on_passenger(next_position))
 
-    def do_pick_up_action(self, state: TaxiState) -> TaxiState:
-        if state.passenger_station: # already has a passenger
+    def map_pick_up_action(self, state: TaxiState) -> TaxiState:
+        if state.passenger_station:  # already has a passenger
             return state
-        if state.position != self.passenger.position: # wrong position
+        if not self.passenger:
             return state
-        return TaxiState(state.position, self.passenger.position)
+        if state.position != self.passenger.position:  # wrong position
+            return state
+        return TaxiState(state.position, self.passenger.passenger_station)
 
     @staticmethod
-    def do_drop_off_action(state: TaxiState) -> TaxiState:
-        if not state.passenger_station: # no passenger
+    def map_drop_off_action(state: TaxiState) -> TaxiState:
+        if not state.passenger_station:  # no passenger
             return state
-        if state.position != state.passenger_station.position: # wrong drop off place
+        if not state.passenger_station:
+            return state
+        if state.position != state.passenger_station.position:  # wrong drop off place
             return state
         return TaxiState(state.position, None)
+
+    def on_passenger(self, position: Position) -> bool:
+        if not self.passenger:
+            return False
+        return position == self.passenger.position
 
     def do_action(self, action: TaxiAction) -> Tuple[float, TaxiState]:
         noise = self.action_noise[action]
         if np.random.rand() < noise:
             action = np.random.choice(self.get_possible_actions())
         next_state = self.get_next_state(self.current_state, action)
+        if action == TaxiAction.DROPOFF:  # drop off
+            self.passenger = TaxiState(self.random_position(), self.random_station())
+        if action == TaxiAction.PICKUP:  # pick up
+            self.passenger = None
         reward = self.get_reward(self.current_state, next_state, action)
         self.current_state = next_state
         return reward, self.current_state
@@ -145,7 +159,8 @@ class TaxiEnvironmentWorld:
         return choice(self.stations)
 
     def reset_passenger(self):
-        self.passenger = TaxiState(self.random_position(), self.random_station())
+        origin_station = self.random_station()
+        self.passenger = TaxiState(origin_station.position, self.random_station())
 
     def reset(self):
         self.current_state = TaxiState(self.random_position(), None)

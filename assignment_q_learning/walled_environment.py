@@ -21,7 +21,6 @@ class Action(str, Enum):
 
 State = Tuple[int, int]
 
-
 class WalledEnvironmentWorld:
     ACTIONS = [Action(action) for action in Action]
 

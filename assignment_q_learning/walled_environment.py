@@ -78,7 +78,7 @@ class WalledEnvironmentWorld:
         elif action == Action.RIGHT:
             x_ = min(self.num_cols - 1, x + 1)
         next_state = (x_, y_)
-        if (state, next_state) in self.walls:
+        if (state, next_state) in self.walls or (next_state, state) in self.walls:
             next_state = state
         return next_state
 

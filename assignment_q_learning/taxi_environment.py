@@ -110,7 +110,7 @@ class TaxiEnvironmentWorld:
         elif action == TaxiAction.RIGHT:
             x_ = min(self.num_cols - 1, x + 1)
         next_position = (x_, y_)
-        if (state, next_position) in self.walls:
+        if (state, next_position) in self.walls or (next_position, state) in self.walls:
             next_position = state
         return TaxiState(next_position, state.passenger_station)
 

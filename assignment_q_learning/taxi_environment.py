@@ -111,7 +111,7 @@ class TaxiEnvironmentWorld:
             x_ = min(self.num_cols - 1, x + 1)
         next_position = (x_, y_)
         if (state, next_position) in self.walls or (next_position, state) in self.walls:
-            next_position = state
+            next_position = (x, y)
         return TaxiState(next_position, state.passenger_station)
 
     def do_pick_up_action(self, state: TaxiState) -> TaxiState:

@@ -111,7 +111,7 @@ class TaxiEnvironmentWorld:
         elif action == TaxiAction.RIGHT:
             x_ = min(self.num_cols - 1, x + 1)
         next_position = (x_, y_)
-        if (state, next_position) in self.walls or (next_position, state) in self.walls:
+        if (state.position, next_position) in self.walls or (next_position, state.position) in self.walls:
             next_position = (x, y)
         return TaxiState(next_position, state.passenger_station, on_passenger=self.on_passenger(next_position))
 
@@ -144,11 +144,11 @@ class TaxiEnvironmentWorld:
         if np.random.rand() < noise:
             action = np.random.choice(self.get_possible_actions())
         next_state = self.get_next_state(self.current_state, action)
-        if action == TaxiAction.DROPOFF:  # drop off
-            self.passenger = TaxiState(self.random_position(), self.random_station())
-        if action == TaxiAction.PICKUP:  # pick up
-            self.passenger = None
         reward = self.get_reward(self.current_state, next_state, action)
+        if action == TaxiAction.DROPOFF and next_state != self.current_state:  # successful drop off
+            self.reset_passenger()
+        if action == TaxiAction.PICKUP and next_state != self.current_state:  # pick up
+            self.passenger = None
         self.current_state = next_state
         return reward, self.current_state
 
